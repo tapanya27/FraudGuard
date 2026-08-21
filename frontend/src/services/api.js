@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = String(
+  import.meta.env.VITE_API_URL || "http://localhost:5000"
+).replace(/\/$/, "");
 
 const client = axios.create({
   baseURL: API_URL,
@@ -29,7 +31,7 @@ function getErrorMessage(error) {
     return "Request timed out. Please try again.";
   }
   if (error.message === "Network Error") {
-    return "Unable to reach the Node backend. Is it running on port 5000?";
+    return `Unable to reach the API at ${API_URL}. Check VITE_API_URL and that the backend is running.`;
   }
   return error.message || "Request failed";
 }

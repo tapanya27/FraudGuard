@@ -7,8 +7,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Health is available to any authenticated user (Model Performance is ADMIN-only in UI)
-router.get("/health", requireAuth, health);
+router.get("/health", health);
 router.post("/predict", requireAuth, predict);
 
 // Optional: mark model performance view for audit when ADMIN hits this lightweight endpoint

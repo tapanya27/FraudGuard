@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const pool = require("../config/db");
+const { wrapDbError } = pool;
 const {
   isValidEmail,
   normalizeEmail,
@@ -8,12 +9,6 @@ const {
 
 const SALT_ROUNDS = 10;
 const ALLOWED_ROLES = ["ADMIN", "ANALYST"];
-
-function wrapDbError(error, fallbackMessage) {
-  const wrapped = new Error(fallbackMessage);
-  wrapped.status = 500;
-  return wrapped;
-}
 
 function sanitizeUser(row) {
   if (!row) return null;

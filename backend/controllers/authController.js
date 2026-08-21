@@ -61,23 +61,33 @@ async function register(req, res, next) {
 }
 
 async function login(req, res, next) {
+  const emailForLog = normalizeEmail(req.body?.email);
+
   try {
     const { email, password } = req.body || {};
 
     if (!email || !password) {
+      console.warn("Login rejected: missing email or password");
       const err = new Error("Email and password are required");
       err.status = 400;
       throw err;
     }
 
-    const row = await findUserByEmail(normalizeEmail(email));
+    console.info("Login attempt", { email: emailForLog });
+
+    const row = await findUserByEmail(email);
 
     if (!row || !(await verifyPassword(password, row.password_hash))) {
+      console.warn("Login failed: invalid credentials", {
+        email: emailForLog,
+        userFound: Boolean(row),
+      });
+
       await createAuditLog({
         userId: row ? row.id : null,
         action: "LOGIN_FAILED",
         resource: "auth",
-        metadata: { email: String(email).trim().toLowerCase() },
+        metadata: { email: emailForLog },
       });
 
       const err = new Error("Invalid credentials");
@@ -86,6 +96,10 @@ async function login(req, res, next) {
     }
 
     if (!row.is_active) {
+      console.warn("Login failed: account deactivated", {
+        email: emailForLog,
+        userId: row.id,
+      });
       const err = new Error("Account is deactivated");
       err.status = 403;
       throw err;
@@ -109,12 +123,25 @@ async function login(req, res, next) {
 
     const token = signToken(user);
 
+    console.info("Login success", {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
     res.json({
       success: true,
       token,
       user,
     });
   } catch (error) {
+    if (!error.status || error.status >= 500) {
+      console.error("Login error", {
+        email: emailForLog,
+        message: error.message,
+        code: error.code || error.cause?.code || null,
+      });
+    }
     next(error);
   }
 }

@@ -1,14 +1,30 @@
 function errorHandler(err, req, res, next) {
   const status = err.status || err.statusCode || 500;
-  const message =
-    status === 500
-      ? "Internal server error"
-      : err.message || "Request failed";
+  const isServerError = status >= 500;
+  let clientMessage = isServerError
+    ? err.message && err.message !== "Internal server error"
+      ? err.message
+      : "Internal server error"
+    : err.message || "Request failed";
+
+  if (err.message === "JWT_SECRET is not set") {
+    clientMessage = "Authentication is not configured on the server.";
+  }
+
+  if (isServerError) {
+    console.error("Request failed", {
+      method: req.method,
+      path: req.originalUrl,
+      status,
+      message: err.message,
+      code: err.code || err.cause?.code || null,
+    });
+  }
 
   const payload = {
     success: false,
-    error: message,
-    message,
+    error: clientMessage,
+    message: clientMessage,
   };
 
   if (Array.isArray(err.errors) && err.errors.length > 0) {

@@ -9,15 +9,25 @@ const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const sampleRoutes = require("./routes/sampleRoutes");
 const errorHandler = require("./middleware/errorHandler");
+const { checkDatabaseHealth } = require("./config/db");
 
 if (!process.env.JWT_SECRET) {
-  console.warn("WARNING: JWT_SECRET is not set");
+  console.warn("WARNING: JWT_SECRET is not set — login will fail until it is configured");
 }
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const corsOrigins = String(process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
+  })
+);
 app.use(express.json({ limit: "16kb" }));
 
 app.use("/api/auth", authRoutes);
@@ -39,4 +49,7 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`Node backend running on http://localhost:${PORT}`);
   console.log(`ML service URL: ${process.env.ML_SERVICE_URL}`);
+  checkDatabaseHealth().then((status) => {
+    console.log(`Database: ${status}`);
+  });
 });

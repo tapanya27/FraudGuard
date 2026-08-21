@@ -3,7 +3,9 @@ const jwt = require("jsonwebtoken");
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    throw new Error("JWT_SECRET is not set");
+    const err = new Error("JWT_SECRET is not set");
+    err.status = 500;
+    throw err;
   }
   return secret;
 }
