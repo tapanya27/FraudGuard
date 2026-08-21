@@ -84,6 +84,17 @@ class PredictionResponse(BaseModel):
     explanation: Optional[Explanation] = None
 
 
+@app.on_event("startup")
+def warmup_explainers():
+    """Build SHAP explainers at boot so the first /predict is not a 30s+ cold hit."""
+    try:
+        zeros = [0.0] * len(FEATURE_NAMES)
+        explain(zeros)
+        print("SHAP explainers warmed up")
+    except Exception as e:
+        print("SHAP warmup skipped:", type(e).__name__, str(e))
+
+
 # ============================================================
 # HEALTH CHECK
 # ============================================================
@@ -145,8 +156,8 @@ def predict_fraud(
             detail=str(e)
         )
 
-    except Exception:
-
+    except Exception as e:
+        print("Prediction failed:", type(e).__name__, str(e))
         raise HTTPException(
             status_code=500,
             detail="Prediction failed"
