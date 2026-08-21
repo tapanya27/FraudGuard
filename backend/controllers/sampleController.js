@@ -9,7 +9,7 @@ async function listSampleTransactions(req, res, next) {
   try {
     const type = req.query.type || "fraud";
     const limit = req.query.limit || 25;
-    const result = listSamples(type, limit);
+    const result = await listSamples(type, limit);
 
     res.json({
       success: true,
@@ -22,7 +22,7 @@ async function listSampleTransactions(req, res, next) {
 
 async function getSampleTransaction(req, res, next) {
   try {
-    const data = getSampleByIndex(req.params.index);
+    const data = await getSampleByIndex(req.params.index);
 
     res.json({
       success: true,
@@ -36,7 +36,7 @@ async function getSampleTransaction(req, res, next) {
 async function getRandomSampleTransaction(req, res, next) {
   try {
     const type = req.query.type || "any";
-    const data = getRandomSample(type);
+    const data = await getRandomSample(type);
 
     res.json({
       success: true,
@@ -49,7 +49,7 @@ async function getRandomSampleTransaction(req, res, next) {
 
 async function getSampleStats(req, res, next) {
   try {
-    const stats = getDatasetStats();
+    const stats = await getDatasetStats();
     res.json({
       success: true,
       stats,

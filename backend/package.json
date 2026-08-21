@@ -10,6 +10,7 @@
     "seed:admin": "node scripts/seedAdmin.js"
   },
   "dependencies": {
+    "@huggingface/hub": "^2.15.0",
     "axios": "^1.8.4",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",

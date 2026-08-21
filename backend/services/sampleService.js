@@ -1,4 +1,5 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const FEATURE_NAMES = [
@@ -19,9 +20,11 @@ const INTERPRETABLE_FIELDS = [
 
 const ADVANCED_FIELDS = FEATURE_NAMES.filter((name) => name.startsWith("V"));
 
-const CSV_PATH = path.join(__dirname, "..", "..", "test_smote.csv");
+const LOCAL_CSV_PATH = path.join(__dirname, "..", "..", "test_smote.csv");
+const HF_CACHE_PATH = path.join(os.tmpdir(), "test_smote.csv");
 
 let cache = null;
+let downloadPromise = null;
 
 function wrapDbError(message, status = 500) {
   const err = new Error(message);
@@ -33,16 +36,114 @@ function parseCsvLine(line) {
   return line.split(",");
 }
 
-function loadDataset() {
-  if (cache) {
-    return cache;
+function fileExists(filePath) {
+  try {
+    return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
+  } catch {
+    return false;
+  }
+}
+
+function isHfConfigured() {
+  return Boolean(
+    process.env.HF_TOKEN &&
+      process.env.HF_DATASET_REPO &&
+      process.env.HF_DATASET_FILE
+  );
+}
+
+async function downloadFromHuggingFace(destPath) {
+  const repo = String(process.env.HF_DATASET_REPO).trim();
+  const file = String(process.env.HF_DATASET_FILE).trim();
+  const token = process.env.HF_TOKEN;
+
+  console.info("Downloading sample dataset from Hugging Face Hub", {
+    repo,
+    file,
+  });
+
+  let blob;
+  try {
+    const { downloadFile } = await import("@huggingface/hub");
+    blob = await downloadFile({
+      repo: { type: "dataset", name: repo },
+      path: file,
+      accessToken: token,
+    });
+  } catch (error) {
+    console.error("Hugging Face dataset download failed", {
+      repo,
+      file,
+      message: error.message,
+    });
+    throw wrapDbError(
+      "Failed to download sample dataset test_smote.csv from Hugging Face Hub",
+      503
+    );
   }
 
-  if (!fs.existsSync(CSV_PATH)) {
+  if (!blob) {
+    throw wrapDbError(
+      "Sample dataset test_smote.csv not found on Hugging Face Hub",
+      500
+    );
+  }
+
+  const partialPath = `${destPath}.partial`;
+  try {
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    if (buffer.length === 0) {
+      throw wrapDbError("Downloaded sample dataset is empty", 500);
+    }
+    fs.writeFileSync(partialPath, buffer);
+    fs.renameSync(partialPath, destPath);
+    console.info("Sample dataset cached", { bytes: buffer.length });
+  } catch (error) {
+    try {
+      if (fs.existsSync(partialPath)) {
+        fs.unlinkSync(partialPath);
+      }
+    } catch {
+      // ignore cleanup errors
+    }
+    if (error.status) {
+      throw error;
+    }
+    console.error("Failed to write downloaded sample dataset", {
+      message: error.message,
+    });
+    throw wrapDbError(
+      "Failed to store sample dataset test_smote.csv",
+      500
+    );
+  }
+}
+
+async function resolveCsvPath() {
+  if (fileExists(LOCAL_CSV_PATH)) {
+    return LOCAL_CSV_PATH;
+  }
+
+  if (fileExists(HF_CACHE_PATH)) {
+    return HF_CACHE_PATH;
+  }
+
+  if (!isHfConfigured()) {
     throw wrapDbError("Sample dataset test_smote.csv not found", 500);
   }
 
-  const raw = fs.readFileSync(CSV_PATH, "utf8").trim();
+  if (!downloadPromise) {
+    downloadPromise = downloadFromHuggingFace(HF_CACHE_PATH).finally(() => {
+      downloadPromise = null;
+    });
+  }
+
+  await downloadPromise;
+  return HF_CACHE_PATH;
+}
+
+function parseDataset(csvPath) {
+  const raw = fs.readFileSync(csvPath, "utf8").trim();
   const lines = raw.split(/\r?\n/);
 
   if (lines.length < 2) {
@@ -113,13 +214,21 @@ function loadDataset() {
     }
   }
 
-  cache = {
+  return {
     rows,
     fraudIndices,
     legitimateIndices,
     total: rows.length,
   };
+}
 
+async function loadDataset() {
+  if (cache) {
+    return cache;
+  }
+
+  const csvPath = await resolveCsvPath();
+  cache = parseDataset(csvPath);
   return cache;
 }
 
@@ -154,8 +263,8 @@ function buildDetail(row) {
   };
 }
 
-function listSamples(type = "fraud", limit = 25) {
-  const dataset = loadDataset();
+async function listSamples(type = "fraud", limit = 25) {
+  const dataset = await loadDataset();
   const normalized = String(type || "fraud").toLowerCase();
   let indices;
 
@@ -178,8 +287,8 @@ function listSamples(type = "fraud", limit = 25) {
   };
 }
 
-function getSampleByIndex(index) {
-  const dataset = loadDataset();
+async function getSampleByIndex(index) {
+  const dataset = await loadDataset();
   const idx = Number.parseInt(index, 10);
 
   if (!Number.isFinite(idx) || idx < 0 || idx >= dataset.rows.length) {
@@ -189,8 +298,8 @@ function getSampleByIndex(index) {
   return buildDetail(dataset.rows[idx]);
 }
 
-function getRandomSample(type = "any") {
-  const dataset = loadDataset();
+async function getRandomSample(type = "any") {
+  const dataset = await loadDataset();
   const normalized = String(type || "any").toLowerCase();
   let pool;
 
@@ -212,8 +321,8 @@ function getRandomSample(type = "any") {
   return buildDetail(dataset.rows[pick]);
 }
 
-function getDatasetStats() {
-  const dataset = loadDataset();
+async function getDatasetStats() {
+  const dataset = await loadDataset();
   return {
     total: dataset.total,
     fraud: dataset.fraudIndices.length,
