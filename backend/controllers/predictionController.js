@@ -78,26 +78,26 @@ async function predict(req, res, next) {
   }
 }
 
-async function health(req, res, next) {
-  try {
-    const [mlStatus, dbStatus] = await Promise.all([
-      checkMlHealth(),
-      checkDatabaseHealth(),
-    ]);
+async function health(req, res) {
+  const [database, ml] = await Promise.all([
+    checkDatabaseHealth()
+      .then((status) => (status === "connected" ? "online" : "offline"))
+      .catch((error) => {
+        console.error("Health database check failed", { message: error.message });
+        return "offline";
+      }),
+    checkMlHealth().catch((error) => {
+      console.warn("Health ML check failed", { message: error.message });
+      return "offline";
+    }),
+  ]);
 
-    const mlOk = mlStatus === "connected";
-    const dbOk = dbStatus === "connected";
-    const healthy = mlOk && dbOk;
-
-    res.status(healthy ? 200 : 503).json({
-      status: healthy ? "healthy" : "degraded",
-      backend: "running",
-      database: dbStatus,
-      ml_service: mlStatus,
-    });
-  } catch (error) {
-    next(error);
-  }
+  res.status(200).json({
+    success: true,
+    api: "online",
+    database,
+    ml: ml === "online" ? "online" : "offline",
+  });
 }
 
 module.exports = {

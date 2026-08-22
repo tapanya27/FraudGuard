@@ -28,16 +28,19 @@ export function SectionLabel({ kicker, title, subtitle }) {
   );
 }
 
-export function StatusDot({ online, label }) {
+export function StatusDot({ online, label, alertWhenOffline = false }) {
+  const offlineDot = alertWhenOffline ? "bg-fraud" : "bg-slate-muted";
+  const offlineText = alertWhenOffline ? "text-fraud-soft" : "text-slate-muted";
+
   return (
     <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wider">
       <span
         className={`h-1.5 w-1.5 rounded-full ${
-          online ? "animate-pulse-dot bg-legit" : "bg-slate-muted"
+          online ? "animate-pulse-dot bg-legit" : offlineDot
         }`}
         aria-hidden="true"
       />
-      <span className={online ? "text-legit-soft" : "text-slate-muted"}>
+      <span className={online ? "text-legit-soft" : offlineText}>
         {label}
       </span>
     </span>

@@ -84,9 +84,12 @@ function ModelPerformance() {
     selected: row.selected,
   }));
 
-  const mlConnected = health?.ml_service === "connected";
-  const dbConnected = health?.database === "connected";
-  const backendRunning = health?.backend === "running";
+  const mlConnected =
+    health?.ml === "online" || health?.ml_service === "connected";
+  const dbConnected =
+    health?.database === "online" || health?.database === "connected";
+  const backendRunning =
+    health?.api === "online" || health?.backend === "running";
 
   return (
     <div className="space-y-8">

@@ -71,7 +71,11 @@ export function logout() {
 }
 
 export function getHealth() {
-  return request(() => client.get("/api/health"));
+  return request(() =>
+    client.get("/api/health", {
+      validateStatus: (status) => status >= 200 && status < 500,
+    })
+  );
 }
 
 export function getStats() {

@@ -2,7 +2,7 @@ const axios = require("axios");
 
 const ML_SERVICE_URL = String(process.env.ML_SERVICE_URL || "").replace(/\/$/, "");
 const PREDICT_TIMEOUT_MS = Number(process.env.ML_PREDICT_TIMEOUT_MS) || 90000;
-const HEALTH_TIMEOUT_MS = Number(process.env.ML_HEALTH_TIMEOUT_MS) || 12000;
+const HEALTH_TIMEOUT_MS = Number(process.env.ML_HEALTH_TIMEOUT_MS) || 4000;
 const RETRY_DELAY_MS = 2000;
 
 if (!ML_SERVICE_URL) {
@@ -179,14 +179,10 @@ async function predictFraud(features) {
 
 async function checkMlHealth() {
   try {
-    const response = await requestWithRetry(
-      () =>
-        axios.get(`${ML_SERVICE_URL}/health`, {
-          timeout: HEALTH_TIMEOUT_MS,
-          headers: { "Content-Type": "application/json" },
-        }),
-      "health"
-    );
+    const response = await axios.get(`${ML_SERVICE_URL}/health`, {
+      timeout: HEALTH_TIMEOUT_MS,
+      headers: { "Content-Type": "application/json" },
+    });
     const healthy =
       response.status === 200 &&
       response.data &&
@@ -196,22 +192,24 @@ async function checkMlHealth() {
       host: mlHost(),
       httpStatus: response.status,
       healthy,
+      timeoutMs: HEALTH_TIMEOUT_MS,
     });
 
-    return healthy ? "connected" : "unhealthy";
+    return healthy ? "online" : "offline";
   } catch (error) {
     debugLog("C", "mlService.js:checkMlHealth", "ML health failed", {
       host: mlHost(),
       code: error.code || null,
       httpStatus: error.response?.status || null,
       message: error.message,
+      timeoutMs: HEALTH_TIMEOUT_MS,
     });
     console.warn("ML health check failed", {
       host: mlHost(),
       code: error.code || null,
       status: error.response?.status || null,
     });
-    return "disconnected";
+    return "offline";
   }
 }
 
